@@ -23,7 +23,7 @@ email: will@op13.dev
 description: >- # this means to ignore newlines until "baseurl:"
   Notes on tech, DevOps, and other related musings.
 baseurl: "" # the subpath of your site, e.g. /blog
-url: "https://op13.dev" # the base hostname & protocol for your site, e.g. http://example.com
+url: "https://william-opie.github.io" # the base hostname & protocol for your site, e.g. http://example.com
 twitter_username: OP13
 github_username:  william-opie
 
