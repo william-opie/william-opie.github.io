@@ -10,6 +10,7 @@ Creating a blog is a great way to document and share the knowledge you've gained
 These instructions are written for Windows users. If you're using other platforms, Jekyll (a static site generator) has [a step-by-step tutorial](http://https://jekyllrb.com/docs/step-by-step/01-setup/) with instructions for other platforms. 
 
 **Prerequisites**
+
 A few tools are recommended/required before you begin:
 1. [Git](https://git-scm.com/download/win): Git is a version control tool. The links below utilize Git to push code for the blog to GitHub. This link from GitHub provides instructions for installing and setting up Git: https://docs.github.com/en/get-started/quickstart/set-up-git
 2. [VSCode](https://code.visualstudio.com/Download): Visual Studio Code (aka VSCode) is a free code editor from Microsoft. You can use VSCode to edit configuration files for the blog, and you can its integrated terminal to run the commands listed in the the below links.
