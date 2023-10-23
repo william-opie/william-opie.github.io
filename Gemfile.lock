@@ -290,7 +290,7 @@ PLATFORMS
   x64-mingw-ucrt
 
 DEPENDENCIES
-  github-pages
+  github-pages (~> 228)
   http_parser.rb (~> 0.6.0)
   jekyll-admin
   jekyll-feed (~> 0.12)
