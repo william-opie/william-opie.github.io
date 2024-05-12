@@ -1,5 +1,14 @@
 {
   "dependencies": {
-    "simple-jekyll-search": "^1.10.0"
+    "simple-jekyll-search": "^1.10.0",
+    "tinacms": "^1.6.3"
+  },
+  "devDependencies": {
+    "@tinacms/cli": "^1.5.45",
+    "@types/node": "^20.12.11"
+  },
+  "scripts": {
+    "dev": "tinacms dev -c \"bundle exec jekyll serve --livereload\"",
+    "build": "tinacms build && jekyll build"
   }
 }
