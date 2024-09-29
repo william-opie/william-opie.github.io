@@ -1,0 +1,45 @@
+---
+permalink: /search
+layout: base
+---
+
+<style>
+  .search-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  #search-input {
+    background-color: black;
+    color: white;
+    border: 1px solid gray;
+    padding: 10px;
+    border-radius: 5px;
+    width: 75%;
+    margin: auto;
+  }
+  #results-container {
+    width: 75%;
+    box-sizing: border-box;
+    margin: 10px auto;
+    text-align: left;
+  }
+  /* Style for the individual search result items */
+  #results-container li {
+    display: block;
+  }
+</style>
+<div class="search-container">
+  <input type="text" id="search-input" placeholder="Search blog posts..">
+</div>
+<div>
+  <ul id="results-container"></ul>
+  <script src="https://unpkg.com/simple-jekyll-search@latest/dest/simple-jekyll-search.min.js"></script>
+  <script>
+    var sjs = SimpleJekyllSearch({
+    searchInput: document.getElementById('search-input'),
+    resultsContainer: document.getElementById('results-container'),
+    json: '/search.json'
+    })
+  </script>
+</div>
