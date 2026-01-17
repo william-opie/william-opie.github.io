@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Jekyll CMS</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="app-header">
+        <div>
+          <h1>
+            <button id="home-title" class="title-link" type="button">Jekyll CMS</button>
+          </h1>
+          <p class="subtitle">Manage your Jekyll markdown posts.</p>
+        </div>
+        <div class="header-actions">
+          <button
+            id="theme-toggle"
+            class="ghost icon-button"
+            type="button"
+            aria-label="Toggle dark mode"
+          >
+            🌙
+          </button>
+          <button id="new-post-button" class="primary" type="button">New Post</button>
+        </div>
+      </header>
+
+      <main>
+        <section id="list-view">
+          <div class="list-header">
+            <span id="list-status">Loading posts...</span>
+            <button id="refresh-posts" class="ghost">Refresh</button>
+          </div>
+          <div id="posts-list" class="posts-list"></div>
+        </section>
+
+        <section id="editor-view" class="hidden">
+          <div class="editor-header">
+            <button id="back-button" class="ghost">Back to posts</button>
+            <span id="editor-status" class="feedback"></span>
+          </div>
+
+          <div class="form-grid">
+            <label>
+              Title
+              <input id="post-title" type="text" placeholder="Post title" />
+            </label>
+            <label>
+              Date
+              <input id="post-date" type="datetime-local" />
+            </label>
+            <label class="full-width">
+              Tags
+              <input
+                id="post-tags"
+                type="text"
+                placeholder="tag-one, tag-two"
+              />
+            </label>
+            <label class="full-width">
+              Body
+              <div class="toolbar">
+                <button type="button" data-format="bold"><strong>B</strong></button>
+                <button type="button" data-format="italic"><em>I</em></button>
+                <button type="button" data-format="underline"><u>U</u></button>
+                <button type="button" data-format="link">Link</button>
+                <button type="button" data-format="indent">Indent</button>
+                <button type="button" data-format="outdent">Outdent</button>
+                <button
+                  id="toggle-source"
+                  class="ghost"
+                  type="button"
+                  data-format="source"
+                >
+                  Source
+                </button>
+                <span class="toolbar-hint">Use Tab/Shift+Tab too.</span>
+              </div>
+              <div
+                id="post-body-editor"
+                class="editor"
+                contenteditable="true"
+                data-placeholder="Write your post..."
+              ></div>
+              <textarea
+                id="post-body-source"
+                class="editor hidden"
+                rows="18"
+                placeholder="Write your post..."
+              ></textarea>
+            </label>
+          </div>
+
+          <div class="actions">
+            <button id="save-draft" class="ghost">Save Draft</button>
+            <button id="publish-post" class="primary">Publish</button>
+            <button id="discard-post" class="danger">Discard</button>
+          </div>
+        </section>
+      </main>
+      <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/turndown/dist/turndown.min.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
