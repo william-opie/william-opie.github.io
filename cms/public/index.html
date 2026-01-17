@@ -60,13 +60,21 @@
                 placeholder="tag-one, tag-two"
               />
             </label>
-            <label class="full-width">
-              Body
+            <div class="field full-width">
+              <div class="field-label">Body</div>
               <div class="toolbar">
                 <button type="button" data-format="bold"><strong>B</strong></button>
                 <button type="button" data-format="italic"><em>I</em></button>
                 <button type="button" data-format="underline"><u>U</u></button>
-                <button type="button" data-format="link">Link</button>
+                <button type="button" data-format="clear" aria-label="Clear formatting">🧹</button>
+                <button type="button" data-format="link" aria-label="Add link">🔗</button>
+                <button
+                  type="button"
+                  data-format="unlink"
+                  aria-label="Remove link"
+                >
+                  🔗❌
+                </button>
                 <button type="button" data-format="indent">Indent</button>
                 <button type="button" data-format="outdent">Outdent</button>
                 <button
@@ -91,17 +99,35 @@
                 rows="18"
                 placeholder="Write your post..."
               ></textarea>
-            </label>
+            </div>
           </div>
 
           <div class="actions">
             <button id="save-draft" class="ghost">Save Draft</button>
             <button id="publish-post" class="primary">Publish</button>
             <button id="discard-post" class="danger">Discard</button>
+            <button id="delete-post" class="danger hidden" type="button">Delete Post</button>
           </div>
         </section>
       </main>
       <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+      <dialog id="link-dialog" class="link-dialog">
+        <form id="link-form" class="dialog-form" novalidate>
+          <h2>Insert Link</h2>
+          <label>
+            URL
+            <input id="link-url" type="url" placeholder="https://" required />
+          </label>
+          <label>
+            Link text
+            <input id="link-text" type="text" placeholder="Link text" />
+          </label>
+          <div class="dialog-actions">
+            <button type="submit" id="link-save" class="primary">Save</button>
+            <button type="button" id="link-cancel" class="ghost">Cancel</button>
+          </div>
+        </form>
+      </dialog>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>

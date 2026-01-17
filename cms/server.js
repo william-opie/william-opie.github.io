@@ -36,7 +36,7 @@ const ensureGitIdentity = async () => {
   return { status: "configured" };
 };
 
-const commitChanges = async (action, title) => {
+const commitChanges = async (action, title, messageOverride = "") => {
   if (!gitEnabled || !git) {
     return { status: "disabled" };
   }
@@ -56,9 +56,9 @@ const commitChanges = async (action, title) => {
   }
 
   const safeTitle = title || "Untitled";
-  const message = `${action}: ${safeTitle}`;
+  const message = messageOverride || `${action}: ${safeTitle}`;
 
-  await git.add(["_posts", "_drafts"]);
+  await git.add(["-A", "_posts", "_drafts"]);
   await git.commit(message);
 
   return { status: "committed", message };
@@ -452,12 +452,30 @@ app.put("/api/posts/*", async (req, res) => {
 
 app.delete("/api/posts/*", async (req, res) => {
   try {
-    const { collection, fullPath } = ensureValidId(req.params[0]);
-    if (collection !== "drafts") {
-      return res.status(400).json({ error: "Only drafts can be deleted." });
+    const { fullPath, filename } = ensureValidId(req.params[0]);
+    const commit = req.query.commit !== "false";
+
+    let title = filename.replace(/\.md$/, "");
+    if (commit) {
+      const { data } = await readPost(fullPath);
+      title = data.title || title;
     }
+
     await fs.unlink(fullPath);
-    res.json({ status: "deleted" });
+
+    if (!commit) {
+      return res.json({
+        status: "deleted",
+        commitStatus: "skipped"
+      });
+    }
+
+    const commitResult = await commitChanges("Delete", title, `deleted ${title}`);
+
+    res.json({
+      status: "deleted",
+      commitStatus: commitResult.status
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -491,7 +509,7 @@ app.post("/api/git/commit", async (req, res) => {
     if (!message) {
       return res.status(400).json({ error: "Commit message is required." });
     }
-    await git.add(["_posts", "_drafts"]);
+    await git.add(["-A", "_posts", "_drafts"]);
     await git.commit(message);
     res.json({ status: "committed" });
   } catch (error) {
