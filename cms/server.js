@@ -30,9 +30,30 @@ const ensureGitIdentity = async () => {
     return { status: "missing_identity" };
   }
 
-  await git.addConfig("user.name", gitUserName, false, "local");
-  await git.addConfig("user.email", gitUserEmail, false, "local");
+  let existingName;
+  let existingEmail;
 
+  try {
+    existingName = await git.getConfig("user.name", "local");
+  } catch {
+    existingName = null;
+  }
+
+  try {
+    existingEmail = await git.getConfig("user.email", "local");
+  } catch {
+    existingEmail = null;
+  }
+
+  const currentName = existingName && typeof existingName.value === "string" ? existingName.value : null;
+  const currentEmail = existingEmail && typeof existingEmail.value === "string" ? existingEmail.value : null;
+
+  if (currentName !== gitUserName) {
+    await git.addConfig("user.name", gitUserName, false, "local");
+  }
+  if (currentEmail !== gitUserEmail) {
+    await git.addConfig("user.email", gitUserEmail, false, "local");
+  }
   return { status: "configured" };
 };
 
@@ -46,22 +67,30 @@ const commitChanges = async (action, title, messageOverride = "") => {
     return identityResult;
   }
 
-  const status = await git.status();
-  const relevantFiles = status.files.filter((file) =>
-    ["_posts/", "_drafts/"].some((prefix) => file.path.startsWith(prefix))
-  );
+  try {
+    const status = await git.status();
+    const relevantFiles = status.files.filter((file) =>
+      ["_posts/", "_drafts/"].some((prefix) => file.path.startsWith(prefix))
+    );
 
-  if (!relevantFiles.length) {
-    return { status: "skipped" };
+    if (!relevantFiles.length) {
+      return { status: "skipped" };
+    }
+
+    const safeTitle = title || "Untitled";
+    const message = messageOverride || `${action}: ${safeTitle}`;
+
+    await git.add(["-A", "_posts", "_drafts"]);
+    await git.commit(message);
+
+    return { status: "committed", message };
+  } catch (error) {
+    console.error("Git operation failed in commitChanges:", error);
+    return {
+      status: "git_error",
+      error: error && error.message ? error.message : String(error),
+    };
   }
-
-  const safeTitle = title || "Untitled";
-  const message = messageOverride || `${action}: ${safeTitle}`;
-
-  await git.add(["-A", "_posts", "_drafts"]);
-  await git.commit(message);
-
-  return { status: "committed", message };
 };
 
 app.use(express.json({ limit: "8mb" }));
@@ -169,15 +198,13 @@ const fileExists = async (filePath) => {
 };
 
 const uniqueFilename = async (dir, baseName) => {
-  let candidate = `${baseName}.md`;
-  let counter = 1;
-  while (await fileExists(path.join(dir, candidate))) {
-    candidate = `${baseName}-${counter}.md`;
-    counter += 1;
-  }
-  return candidate;
+  // Generate a filename that is inherently unique instead of relying on
+  // a separate existence check, which can race under concurrent access.
+  const timestamp = Date.now();
+  const randomPart = Math.random().toString(36).slice(2, 10);
+  const safeBase = String(baseName || "").trim() || "untitled";
+  return `${safeBase}-${timestamp}-${randomPart}.md`;
 };
-
 const createExcerpt = (content) => {
   if (!content) {
     return "";
@@ -307,13 +334,19 @@ const assembleFrontMatter = ({
     updated.author = defaultAuthor;
   }
 
-  if (collection === "drafts") {
-    if (Object.prototype.hasOwnProperty.call(existingData, "published") || publish) {
-      updated.published = Boolean(publish);
-    }
-  } else if (collection === "posts") {
-    if (Object.prototype.hasOwnProperty.call(existingData, "published")) {
-      updated.published = true;
+  const hasPublished = Object.prototype.hasOwnProperty.call(
+    existingData,
+    "published"
+  );
+  const hasExplicitPublish = typeof publish !== "undefined";
+
+  if (collection === "drafts" || collection === "posts") {
+    if (hasPublished || hasExplicitPublish) {
+      if (hasExplicitPublish) {
+        updated.published = Boolean(publish);
+      } else {
+        updated.published = existingData.published;
+      }
     }
   }
 
@@ -439,7 +472,8 @@ app.put("/api/posts/*", async (req, res) => {
     }
 
     await fs.writeFile(fullPath, markdown, "utf8");
-    const commitResult = await commitChanges("Save draft", title);
+    const commitMessage = collection === "posts" ? "Update post" : "Save draft";
+    const commitResult = await commitChanges(commitMessage, title);
     res.json({
       id: `${collection}/${filename}`,
       status: collection === "posts" ? "published" : "draft",

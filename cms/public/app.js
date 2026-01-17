@@ -34,7 +34,7 @@ const state = {
   currentPostId: null,
   currentStatus: null,
   isNew: false,
-  createdFromNew: false,
+  createdFromNew: false, // Tracks posts created via the "New Post" button in this session before an explicit save
   original: null,
   isDirty: false,
   isSourceMode: false,
@@ -71,9 +71,25 @@ const fetchJson = async (url, options = {}) => {
     ...options
   });
 
-  const data = await response.json().catch(() => ({}));
+  let data = {};
+  let rawText = "";
+
+  try {
+    // Use a cloned response so we can still read the original body if JSON parsing fails.
+    const clonedResponse = response.clone();
+    data = await clonedResponse.json();
+  } catch (e) {
+    // If JSON parsing fails, fall back to the raw response text.
+    try {
+      rawText = await response.text();
+    } catch (innerError) {
+      rawText = "";
+    }
+  }
+
   if (!response.ok) {
-    const errorMessage = data.error || "Request failed.";
+    const errorMessage =
+      (data && data.error) || rawText || "Request failed.";
     throw new Error(errorMessage);
   }
   return data;
@@ -269,16 +285,29 @@ const showToast = (message) => {
   if (!toast) {
     return;
   }
+  // Clear any existing timeout so its ID is not reused
+  if (state.toastTimeout) {
+    clearTimeout(state.toastTimeout);
+    state.toastTimeout = null;
+  }
+
+  // Increment a counter to track the "generation" of this toast
+  state._toastCounter = (state._toastCounter || 0) + 1;
+  const toastId = state._toastCounter;
+
   toast.textContent = message;
   toast.classList.remove("hidden");
   toast.classList.add("show");
-  if (state.toastTimeout) {
-    clearTimeout(state.toastTimeout);
-  }
+
   state.toastTimeout = setTimeout(() => {
+    // If a newer toast has been shown, ignore this timeout
+    if (state._toastCounter !== toastId) {
+      return;
+    }
     toast.classList.remove("show");
     toast.classList.add("hidden");
     toast.textContent = "";
+    state.toastTimeout = null;
   }, 4000);
 };
 
@@ -352,9 +381,125 @@ const adjustIndentation = (outdent = false) => {
   postBodySource.focus();
 };
 
+const withEditorSelection = (callback) => {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) {
+    return;
+  }
+  const range = selection.getRangeAt(0);
+  if (!postBodyEditor.contains(range.commonAncestorContainer)) {
+    return;
+  }
+  callback(selection, range);
+};
+
+const applyInlineFormat = (tagName) => {
+  withEditorSelection((_selection, range) => {
+    if (range.collapsed) {
+      return;
+    }
+    const wrapper = document.createElement(tagName);
+    try {
+      wrapper.appendChild(range.extractContents());
+      range.insertNode(wrapper);
+      range.selectNodeContents(wrapper);
+    } catch (_e) {
+      // Fallback: do nothing on invalid ranges (e.g., partial table selection)
+    }
+  });
+};
+
+const applyLink = (href) => {
+  if (!href) {
+    return;
+  }
+  withEditorSelection((_selection, range) => {
+    if (range.collapsed) {
+      return;
+    }
+    const anchor = document.createElement("a");
+    anchor.href = href;
+    anchor.rel = "noopener noreferrer";
+    try {
+      anchor.appendChild(range.extractContents());
+      range.insertNode(anchor);
+      range.selectNodeContents(anchor);
+    } catch (_e) {
+      // Ignore malformed ranges
+    }
+  });
+};
+
+const removeLink = () => {
+  withEditorSelection((selection, range) => {
+    let node = range.commonAncestorContainer;
+    while (node && node !== postBodyEditor && node.nodeName !== "A") {
+      node = node.parentNode;
+    }
+    if (!node || node === postBodyEditor || node.nodeName !== "A") {
+      return;
+    }
+    const parent = node.parentNode;
+    while (node.firstChild) {
+      parent.insertBefore(node.firstChild, node);
+    }
+    parent.removeChild(node);
+    selection.removeAllRanges();
+    const newRange = document.createRange();
+    newRange.selectNodeContents(parent);
+    selection.addRange(newRange);
+  });
+};
+
+const wrapSelectionInList = (listTag) => {
+  withEditorSelection((_selection, range) => {
+    if (range.collapsed) {
+      return;
+    }
+    const list = document.createElement(listTag);
+    const li = document.createElement("li");
+    try {
+      li.appendChild(range.extractContents());
+      list.appendChild(li);
+      range.insertNode(list);
+      range.selectNodeContents(list);
+    } catch (_e) {
+      // Ignore malformed ranges
+    }
+  });
+};
+
 const applyVisualCommand = (command, value = null) => {
   postBodyEditor.focus();
-  document.execCommand(command, false, value);
+  switch (command) {
+    case "bold":
+      applyInlineFormat("strong");
+      break;
+    case "italic":
+      applyInlineFormat("em");
+      break;
+    case "underline":
+      applyInlineFormat("u");
+      break;
+    case "strikeThrough":
+      applyInlineFormat("s");
+      break;
+    case "insertOrderedList":
+      wrapSelectionInList("ol");
+      break;
+    case "insertUnorderedList":
+      wrapSelectionInList("ul");
+      break;
+    case "createLink":
+      applyLink(value);
+      break;
+    case "unlink":
+      removeLink();
+      break;
+    default:
+      // Unsupported command: no-op to avoid using deprecated execCommand
+      break;
+  }
 };
 
 const hasSourceSelection = () =>
@@ -518,22 +663,42 @@ const withSelectionMarkers = (range, callback) => {
   startRange.collapse(true);
   startRange.insertNode(startMarker);
 
-  callback();
+  let callbackError;
+  try {
+    callback();
+  } catch (err) {
+    // Preserve the error to rethrow after cleanup.
+    callbackError = err;
+  } finally {
+    const selection = window.getSelection();
+    // Only attempt to restore the selection if both markers are still in the document.
+    if (
+      selection &&
+      startMarker.isConnected &&
+      endMarker.isConnected
+    ) {
+      try {
+        const newRange = document.createRange();
+        newRange.setStartAfter(startMarker);
+        newRange.setEndBefore(endMarker);
+        selection.removeAllRanges();
+        selection.addRange(newRange);
+      } catch {
+        // If the DOM has changed in a way that makes selection restoration invalid,
+        // skip adjusting the selection but still clean up markers below.
+      }
+    }
 
-  const selection = window.getSelection();
-  if (selection) {
-    const newRange = document.createRange();
-    newRange.setStartAfter(startMarker);
-    newRange.setEndBefore(endMarker);
-    selection.removeAllRanges();
-    selection.addRange(newRange);
+    if (startMarker.parentNode) {
+      startMarker.parentNode.removeChild(startMarker);
+    }
+    if (endMarker.parentNode) {
+      endMarker.parentNode.removeChild(endMarker);
+    }
   }
 
-  if (startMarker.parentNode) {
-    startMarker.parentNode.removeChild(startMarker);
-  }
-  if (endMarker.parentNode) {
-    endMarker.parentNode.removeChild(endMarker);
+  if (callbackError) {
+    throw callbackError;
   }
 };
 
@@ -677,11 +842,34 @@ const toggleSourceMode = () => {
 };
 
 const sanitizeUrl = (url) => {
+  if (typeof url !== "string") {
+    return "";
+  }
+
   const trimmed = url.trim();
   if (!trimmed) {
     return "";
   }
-  if (/^javascript:/i.test(trimmed)) {
+
+  // Normalize the URL to detect obfuscated javascript: schemes
+  // 1. Remove control characters and whitespace that can be used to hide the protocol
+  let normalized = trimmed.replace(/[\u0000-\u001F\s]+/g, "");
+
+  // 2. Decode percent-encoded sequences a few times to surface encoded "javascript:"
+  let lastValue;
+  let iterations = 0;
+  while (normalized !== lastValue && iterations < 5) {
+    lastValue = normalized;
+    try {
+      normalized = decodeURIComponent(normalized);
+    } catch (e) {
+      // Stop decoding on malformed escape sequences
+      break;
+    }
+    iterations++;
+  }
+
+  if (/^javascript:/i.test(normalized)) {
     return "";
   }
   return trimmed;
