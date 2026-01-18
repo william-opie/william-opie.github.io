@@ -199,15 +199,6 @@ const slugify = (value) => {
 
 const sanitizeText = (value) => (typeof value === "string" ? value.trim() : "");
 
-const fileExists = async (filePath) => {
-  try {
-    await fs.access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-};
-
 const uniqueFilename = async (dir, baseName) => {
   // Generate a filename that is inherently unique instead of relying on
   // a separate existence check, which can race under concurrent access.
