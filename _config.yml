@@ -39,3 +39,10 @@ comments:
     mapping: "pathname"
     reactions_enabled: "1"
     theme: "dark"
+
+exclude:
+  - "cms/"
+  - "node_modules/"
+  - "AGENTS.md"
+  - "README.md"
+  - ".env"
