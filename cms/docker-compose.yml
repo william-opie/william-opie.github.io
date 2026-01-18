@@ -1,0 +1,14 @@
+services:
+  cms:
+    build: .
+    ports:
+      - "4001:3000"
+    environment:
+      BLOG_REPO_ROOT: ${BLOG_REPO_ROOT:-/repo}
+      DEFAULT_AUTHOR: ${DEFAULT_AUTHOR}
+      GIT_ENABLED: ${GIT_ENABLED}
+      GIT_USER_NAME: ${GIT_USER_NAME}
+      GIT_USER_EMAIL: ${GIT_USER_EMAIL}
+      PORT: ${PORT:-3000}
+    volumes:
+      - ..:/repo
