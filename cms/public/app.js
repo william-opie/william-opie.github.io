@@ -63,6 +63,13 @@ if (typeof marked !== "undefined") {
   marked.setOptions({ breaks: true, gfm: true });
 }
 
+const sanitizeHtml = (html) => {
+  if (typeof DOMPurify !== "undefined") {
+    return DOMPurify.sanitize(html);
+  }
+  return html;
+};
+
 const fetchJson = async (url, options = {}) => {
   const response = await fetch(url, {
     headers: {
@@ -234,7 +241,7 @@ const setEditorContent = (markdown) => {
   withSuppressedDirty(() => {
     postBodySource.value = safeMarkdown;
     const html = markdownToHtml(safeMarkdown);
-    postBodyEditor.innerHTML = html || "";
+    postBodyEditor.innerHTML = sanitizeHtml(html) || "";
     ensureVisualEditorHasCaret();
   });
 };
@@ -251,7 +258,7 @@ const syncEditorToSource = () => {
 };
 
 const syncSourceToEditor = () => {
-  postBodyEditor.innerHTML = markdownToHtml(postBodySource.value);
+  postBodyEditor.innerHTML = sanitizeHtml(markdownToHtml(postBodySource.value));
 };
 
 const setEditorMode = (useSource, options = {}) => {
@@ -393,7 +400,7 @@ const withEditorSelection = (callback) => {
   callback(selection, range);
 };
 
-const applyInlineFormat = (tagName) => {
+const wrapSelectionWithTag = (tagName) => {
   withEditorSelection((_selection, range) => {
     if (range.collapsed) {
       return;
@@ -430,26 +437,7 @@ const applyLink = (href) => {
   });
 };
 
-const removeLink = () => {
-  withEditorSelection((selection, range) => {
-    let node = range.commonAncestorContainer;
-    while (node && node !== postBodyEditor && node.nodeName !== "A") {
-      node = node.parentNode;
-    }
-    if (!node || node === postBodyEditor || node.nodeName !== "A") {
-      return;
-    }
-    const parent = node.parentNode;
-    while (node.firstChild) {
-      parent.insertBefore(node.firstChild, node);
-    }
-    parent.removeChild(node);
-    selection.removeAllRanges();
-    const newRange = document.createRange();
-    newRange.selectNodeContents(parent);
-    selection.addRange(newRange);
-  });
-};
+
 
 const wrapSelectionInList = (listTag) => {
   withEditorSelection((_selection, range) => {
@@ -473,16 +461,16 @@ const applyVisualCommand = (command, value = null) => {
   postBodyEditor.focus();
   switch (command) {
     case "bold":
-      applyInlineFormat("strong");
+      wrapSelectionWithTag("strong");
       break;
     case "italic":
-      applyInlineFormat("em");
+      wrapSelectionWithTag("em");
       break;
     case "underline":
-      applyInlineFormat("u");
+      wrapSelectionWithTag("u");
       break;
     case "strikeThrough":
-      applyInlineFormat("s");
+      wrapSelectionWithTag("s");
       break;
     case "insertOrderedList":
       wrapSelectionInList("ol");

@@ -13,6 +13,8 @@ const gitEnabled = process.env.GIT_ENABLED !== "false";
 const gitUserName = process.env.GIT_USER_NAME || "";
 const gitUserEmail = process.env.GIT_USER_EMAIL || "";
 
+const MAX_BODY_SIZE = 5 * 1024 * 1024; // 5MB
+
 if (!repoRoot) {
   console.error("BLOG_REPO_ROOT is required.");
   process.exit(1);
@@ -57,7 +59,7 @@ const ensureGitIdentity = async () => {
   return { status: "configured" };
 };
 
-const commitChanges = async (action, title, messageOverride = "") => {
+const commitChanges = async (action, title) => {
   if (!gitEnabled || !git) {
     return { status: "disabled" };
   }
@@ -77,8 +79,8 @@ const commitChanges = async (action, title, messageOverride = "") => {
       return { status: "skipped" };
     }
 
-    const safeTitle = title || "Untitled";
-    const message = messageOverride || `${action}: ${safeTitle}`;
+  const safeTitle = (title || "Untitled").replace(/[\r\n]/g, " ").slice(0, 200);
+  const message = `${action}: ${safeTitle}`;
 
     await git.add(["-A", "_posts", "_drafts"]);
     await git.commit(message);
@@ -122,7 +124,16 @@ const parseDateValue = (value) => {
     return value;
   }
   if (typeof value === "string") {
-    const match = value.match(
+    const trimmed = value.trim();
+
+    // If the string includes a timezone suffix (Z or ±HH:MM), parse with
+    // the built-in Date parser to preserve the original moment in time.
+    if (/Z|[+-]\d{2}:\d{2}$/.test(trimmed)) {
+      const parsed = new Date(trimmed);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    const match = trimmed.match(
       /(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?/
     );
     if (match) {
@@ -390,6 +401,11 @@ app.post("/api/posts", async (req, res) => {
   try {
     const title = sanitizeText(req.body?.title) || "Untitled";
     const body = typeof req.body?.body === "string" ? req.body.body : "";
+    if (body.length > MAX_BODY_SIZE) {
+      return res
+        .status(400)
+        .json({ error: "Post body exceeds maximum size (5MB)." });
+    }
     const dateValue =
       parseInputDate(req.body?.date) || parseDateValue(req.body?.date) || new Date();
     const tags = normalizeTags(req.body?.tags);
@@ -440,6 +456,11 @@ app.put("/api/posts/*", async (req, res) => {
     const title =
       (hasTitleField ? sanitizeText(req.body?.title) : data.title) || "Untitled";
     const body = typeof req.body?.body === "string" ? req.body.body : content;
+    if (body.length > MAX_BODY_SIZE) {
+      return res
+        .status(400)
+        .json({ error: "Post body exceeds maximum size (5MB)." });
+    }
     const dateValue = hasDateField
       ? parseInputDate(req.body?.date) || parseDateValue(req.body?.date)
       : parseDateValue(data.date);
@@ -504,7 +525,7 @@ app.delete("/api/posts/*", async (req, res) => {
       });
     }
 
-    const commitResult = await commitChanges("Delete", title, `deleted ${title}`);
+    const commitResult = await commitChanges("Delete", title);
 
     res.json({
       status: "deleted",
@@ -555,6 +576,12 @@ app.get("*", (req, res) => {
   if (req.path.startsWith("/api")) {
     return res.status(404).json({ error: "Not found." });
   }
+
+  // Avoid serving the SPA HTML for missing static assets (e.g. scripts).
+  if (path.extname(req.path)) {
+    return res.status(404).send("Not found.");
+  }
+
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 

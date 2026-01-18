@@ -1,140 +1,199 @@
 # AGENTS.md
 
 ## Purpose
+
 This repository is a Jekyll-based personal site with Markdown and HTML posts,
-Liquid templates, and Sass styles. Use these notes when making changes so
-agents follow existing conventions and run the right checks.
+Liquid templates, and Sass styles. It also includes a local Node.js CMS for
+managing blog content. Use these notes when making changes so agents follow
+existing conventions and run the right checks.
 
 ## Quick Context
-- Static site built with the Jekyll and the `minima` theme.
+
+- Static site built with Jekyll and the `minima` theme (remote).
 - Source content lives in `_posts/`, `_layouts/`, `_includes/`, and `assets/`.
 - Generated output is in `_site/` and should never be edited manually.
-- Node is only used for the `simple-jekyll-search` dependency.
+- The `cms/` directory contains a local Node.js/Express CMS for editing posts.
+- Root `package.json` only holds `simple-jekyll-search`; CMS deps are separate.
 
 ## Build / Serve / Test
+
 ### Prerequisites
+
 - Ruby + Bundler (see `Gemfile`/`Gemfile.lock`).
-- Node (only if updating `package.json` dependencies).
+- Node 18+ (for the CMS; root deps are optional).
 
 ### Install
-- `bundle install`
-- `npm install` (only if JS deps change)
+
+```bash
+bundle install
+npm install          # optional, for search dependency
+cd cms && npm install  # only if running the CMS
+```
 
 ### Build
-- `bundle exec jekyll build`
-  - Outputs to `_site/`.
+
+```bash
+bundle exec jekyll build   # outputs to _site/
+```
 
 ### Local Server
-- `bundle exec jekyll serve`
-  - Serve locally at `http://localhost:4000`.
+
+```bash
+bundle exec jekyll serve   # http://localhost:4000
+```
+
+### CMS Server
+
+```bash
+cd cms
+cp .env.example .env       # set BLOG_REPO_ROOT to repo path
+npm start                  # http://localhost:3000
+```
 
 ### Lint
-- No lint configuration is present.
+
+- No lint configuration is present for Jekyll files.
+- CMS JavaScript has no configured linter; follow existing style.
 - If adding linting, document commands here.
 
 ### Tests
-- No test runner is configured.
-- There is no single-test command today.
-- If you add tests, also add a single-test command and update this file.
+
+- No test runner is configured for either Jekyll or the CMS.
+- If you add tests, document the single-test command here.
 
 ## Repository Structure
-- `_posts/`: Blog posts (Markdown or HTML with front matter).
-- `_layouts/`: Site-wide layout templates.
-- `_includes/`: Partial templates and shared HTML/Liquid.
-- `assets/`: Sass and static assets.
-- `public/admin/`: Static admin page (do not convert to build output).
-- `_site/`: Generated build output (do not edit).
+
+```
+_posts/        Blog posts (Markdown or HTML with front matter)
+_drafts/       Draft posts (created by CMS, not committed by default)
+_layouts/      Site-wide layout templates
+_includes/     Partial templates and shared HTML/Liquid
+assets/        Sass and static assets
+cms/           Local CMS application (Node.js/Express)
+  public/      CMS frontend (vanilla JS)
+  server.js    CMS backend API
+_site/         Generated build output (do not edit)
+```
 
 ## Code Style Guidelines
+
 ### General
+
 - Keep changes minimal and consistent with existing code.
 - Prefer 2-space indentation for HTML, Liquid, YAML, Sass, and JS.
 - Do not reformat unrelated content.
 - Avoid adding new tooling unless requested.
 
 ### Liquid + HTML
+
 - Use 2 spaces for indentation.
 - Use double quotes for HTML attributes.
 - Keep Liquid tags spaced: `{{ variable | filter }}`.
 - Prefer whitespace-trimming tags where already used: `{%- ... -%}`.
-- Keep includes concise: `{%- include file.html -%}`.
 - Use semantic HTML; avoid div-only structures when possible.
 
 ### Markdown Posts (`_posts/*.md`)
+
 - Filenames: `YYYY-MM-DD-title.md` in kebab-case.
-- Required front matter:
-  - `---` delimiter top and bottom.
-  - Include `title`, `date`, `published`, and `author` where relevant.
+- Required front matter: `title`, `date`, `published`, `author`.
 - Insert a blank line after front matter.
 - Use standard Markdown; only use raw HTML when needed.
-- Keep paragraphs wrapped at a readable width when possible.
-
-### HTML Posts (`_posts/*.html`)
-- Keep front matter intact; do not strip existing metadata.
-- Preserve existing WordPress block comments unless removing on purpose.
-- Maintain existing tag indentation and line breaks.
-- Avoid introducing inline styles in post content.
 
 ### Sass / CSS
+
 - `assets/css/style.scss` uses Jekyll front matter and `@import`.
 - Keep front matter (`---`) at the top.
-- Use double quotes for imports.
 - Prefer variables from `minima` where possible.
 - Keep selectors in kebab-case (e.g., `.search-container`).
 
-### JavaScript
-- JS is only used inline on `search.html`.
-- Keep scripts short and dependency-free.
-- Prefer `const`/`let` for new code, but preserve existing style if editing.
-- Guard DOM lookups if adding new behavior.
+### JavaScript (CMS)
+
+- Use `const`/`let`; avoid `var`.
+- Prefer arrow functions for callbacks.
+- Use async/await over raw Promises where possible.
+- Guard DOM lookups; exit early if nodes are absent.
+- Keep functions small and focused.
 
 ### YAML (`_config.yml` and front matter)
+
 - Use 2 spaces for indentation.
-- Keep keys sorted within a section only when editing that section.
-- Use double quotes for strings with `:` or `{}` characters.
+- Use double quotes for strings with special characters (`:`, `{}`).
 
 ### Naming Conventions
-- Posts, pages, and includes: kebab-case filenames.
-- Liquid variables: lower_snake or lowerCamel based on existing usage.
-- CSS classes/IDs: kebab-case.
+
+| Context            | Convention        |
+|--------------------|-------------------|
+| Post/page files    | kebab-case        |
+| Liquid variables   | lower_snake       |
+| CSS classes/IDs    | kebab-case        |
+| JS variables       | camelCase         |
+| JS constants       | camelCase or UPPER_SNAKE for true constants |
 
 ### Error Handling
-- Prefer Liquid defaults (`| default`) when rendering optional data.
-- Avoid template errors by guarding missing config keys.
-- In JS, exit early if required DOM nodes are absent.
+
+- Liquid: Use `| default` for optional values.
+- JS (browser): Exit early if required DOM nodes are absent.
+- JS (server): Wrap async handlers in try/catch; return JSON errors.
+
+## CMS-Specific Guidelines
+
+### API Conventions
+
+- All API routes start with `/api/`.
+- Return JSON objects with an `error` key on failure.
+- Use appropriate HTTP status codes (201 for create, 400 for bad input).
+
+### File Operations
+
+- Validate paths before reading/writing; ensure they stay within repo root.
+- Use `path.join()` and `path.basename()` for path construction.
+- Prefer `fs/promises` over callback-based `fs`.
+
+### Git Integration
+
+- Git commits are optional (controlled by `GIT_ENABLED` env var).
+- Sanitize commit messages; avoid special characters.
+- Only commit files under `_posts/` and `_drafts/`.
 
 ## Editing Guidance
+
 - Do not edit files in `_site/` or `node_modules/`.
 - For site-wide changes, update `_layouts/` and `_includes/`.
 - For new posts, add a file in `_posts/` with correct front matter.
-- If updating the theme, confirm `remote_theme` and `minima` settings.
+- CMS frontend is vanilla JS; avoid adding frameworks.
 
 ## Search
+
 - `search.json` is generated by Jekyll; do not hand-edit.
 - The search UI lives in `search.html`.
 
 ## Dependencies
-- Ruby gems are declared in `Gemfile`.
-- JS dependencies are listed in `package.json` (no scripts defined).
+
+- Ruby gems: `Gemfile`
+- Root JS: `package.json` (search only)
+- CMS JS: `cms/package.json` (express, gray-matter, simple-git)
 
 ## Cursor / Copilot Rules
-- No `.cursorrules`, `.cursor/rules/`, or `.github/copilot-instructions.md`
-  files were found in this repository.
 
-## When Adding New Tooling
-- Document new commands in this file.
-- Keep tooling lightweight and aligned with Jekyll workflows.
-- Avoid introducing complex build steps without a clear need.
+No `.cursorrules`, `.cursor/rules/`, or `.github/copilot-instructions.md`
+files are present in this repository.
 
-## Release / Deployment Notes
-- GitHub Pages builds the site from source.
-- The build artifact is `_site/` and should not be committed unless the
-  workflow explicitly expects it (currently none noted).
+## Deployment
 
-## Optional Local Checks
-- Run `bundle exec jekyll build` after major template changes.
-- Run `bundle exec jekyll serve` to verify page rendering.
+- GitHub Pages builds the site from source automatically.
+- The `_site/` directory should not be committed.
+- The CMS is local-only and not deployed.
+
+## Verification Commands
+
+```bash
+bundle exec jekyll build   # verify templates compile
+bundle exec jekyll serve   # verify pages render at localhost:4000
+cd cms && npm start        # verify CMS starts (requires .env)
+```
 
 ## Contact Points
-- If unsure about site metadata, check `_config.yml`.
-- For social links, check the `minima.social_links` section.
+
+- Site metadata: `_config.yml`
+- Social links: `minima.social_links` in `_config.yml`
+- CMS configuration: `cms/.env`
