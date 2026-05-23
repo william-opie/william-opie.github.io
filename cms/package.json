@@ -6,7 +6,7 @@
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.19.2",
+    "express": "^4.22.2",
     "gray-matter": "^4.0.3",
     "simple-git": "^3.36.0"
   }
