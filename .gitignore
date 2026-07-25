@@ -6,3 +6,6 @@ _site
 node_modules
 .env
 cms/.env
+.vscode/*
+.frontmatter/*
+frontmatter.json
